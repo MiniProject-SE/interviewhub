@@ -38,3 +38,8 @@ def answer(session_id: int, item_id: int, data: schemas.AnswerIn,
 @router.post("/sessions/{session_id}/finish", response_model=schemas.SessionOut)
 def finish(session_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return service.to_out(service.finish(db, user, session_id))
+
+
+@router.get("/analytics", response_model=schemas.Analytics)
+def analytics(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return service.analytics(db, user)
