@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: flake8
+      - name: Security scan (Bandit)
+        run: bandit -r app -ll
+      - name: Dependency audit
+        run: pip-audit -r requirements.txt || true
+      - name: Tests with branch coverage
+        run: mkdir -p reports && pytest --junitxml=reports/junit.xml --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage.xml
+            reports/junit.xml
+
