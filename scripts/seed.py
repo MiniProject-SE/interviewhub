@@ -198,7 +198,8 @@ def run() -> None:
             q_service.create(db, QuestionCreate(text=text, topic=topic, difficulty=diff, company=company,
                                                 role_title=role, tags=tags, model_answer=answer), admin)
         for exp in EXPERIENCES:
-            exp_service.create(db, student, exp_schemas.ExperienceCreate(**exp))
+            e = exp_service.create(db, student, exp_schemas.ExperienceCreate(**exp))
+            e.status = "approved"
         db.commit()
         print(f"Seeded {len(QUESTIONS)} questions and {len(EXPERIENCES)} experiences.")
     finally:
