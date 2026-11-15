@@ -73,6 +73,12 @@ class QuestionDetail(QuestionOut):
     model_answer: str | None
 
 
+class Suggestion(BaseModel):
+    question: QuestionOut
+    score: float
+    reason: str
+
+
 class QuestionPage(BaseModel):
     items: list[QuestionOut]
     total: int

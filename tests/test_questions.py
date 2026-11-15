@@ -63,3 +63,12 @@ def test_delete_only_moderators(client, seeded, student_h, mod_h):
     assert client.delete(f"/api/questions/{seeded[1]}", headers=student_h).status_code == 403
     assert client.delete(f"/api/questions/{seeded[1]}", headers=mod_h).status_code == 204
     assert client.get(f"/api/questions/{seeded[1]}").status_code == 404
+
+
+def test_suggest_endpoint(client, seeded):
+    res = client.get("/api/questions/suggest", params={"q": "graph cycle", "company": "Google"}).json()
+    assert res[0]["question"]["id"] == seeded[3]
+    assert "asked at this company" in res[0]["reason"]
+    only_os = client.get("/api/questions/suggest", params={"topic": "os", "limit": 10}).json()
+    assert {s["question"]["topic"] for s in only_os} == {"os"}
+    assert client.get("/api/questions/suggest", params={"limit": 0}).status_code == 422

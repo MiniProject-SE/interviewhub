@@ -1,4 +1,4 @@
-/* Question bank browsing and contribution. Owner: Member 3. */
+/* Question bank browsing, contribution and AI suggestions. Owner: Member 3. */
 const Questions = {
   meta: null,
 
@@ -35,6 +35,18 @@ const Questions = {
     view.innerHTML = `
       <div class="row" style="justify-content:space-between"><h2>Question bank</h2>
         <a href="#/questions/new"><button class="primary">+ Add a question</button></a></div>
+      <div class="card">
+        <h3>✨ AI suggestions</h3>
+        <p class="muted">Describe what you're preparing for — e.g. "graph problems for Google SDE" — and we'll rank the most relevant questions.</p>
+        <form id="sug-form" class="row">
+          <input name="q" placeholder="What do you want to practise?" style="flex:2">
+          <input name="company" placeholder="Company" value="${esc(params.company)}">
+          <input name="role" placeholder="Role">
+          <select name="topic"><option value="">Any topic</option>${opt(meta.topics)}</select>
+          <button class="primary">Suggest</button>
+        </form>
+        <div id="sug-list"></div>
+      </div>
       <form id="q-filter" class="card row">
         <input name="q" placeholder="Search">
         <select name="topic"><option value="">All topics</option>${opt(meta.topics, params.topic)}</select>
@@ -50,6 +62,17 @@ const Questions = {
       this.bindAnswers(el);
     };
     document.getElementById("q-filter").onsubmit = (e) => { e.preventDefault(); load(formData(e.target)); };
+    document.getElementById("sug-form").onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const res = await API.get("/api/questions/suggest", { ...formData(e.target), limit: 8 });
+        const el = document.getElementById("sug-list");
+        el.innerHTML = res.map(s => this.row(s.question,
+          `<div class="muted">relevance ${(s.score * 100).toFixed(0)}% — ${esc(s.reason)}</div>`)).join("")
+          || `<p class="muted">No matches.</p>`;
+        this.bindAnswers(el);
+      } catch (err) { toast(err.message, true); }
+    };
     load(params);
   },
 

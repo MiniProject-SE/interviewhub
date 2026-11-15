@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.auth.deps import get_current_user
 from app.modules.auth.models import User
-from app.modules.questions import schemas, service
+from app.modules.questions import recommender, schemas, service
 from app.modules.questions.models import DIFFICULTIES, TOPICS
 
 router = APIRouter(prefix="/api/questions", tags=["questions"])
@@ -33,6 +33,14 @@ def create(data: schemas.QuestionCreate, response: Response,
     response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
     response.headers["X-Duplicate-Merged"] = "false" if created else "true"
     return service.to_out(q)
+
+
+@router.get("/suggest", response_model=list[schemas.Suggestion])
+def suggest(q: str = "", company: str | None = None, role: str | None = None, topic: str | None = None,
+            limit: int = Query(10, ge=1, le=50), db: Session = Depends(get_db)):
+    query = recommender.Query(text=q, company=company, role_title=role, topic=topic, limit=limit)
+    return [schemas.Suggestion(question=service.to_out(qn), score=s, reason=r)
+            for qn, s, r in service.suggest(db, query)]
 
 
 @router.get("/{question_id}", response_model=schemas.QuestionDetail)

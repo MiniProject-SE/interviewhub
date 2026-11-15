@@ -125,6 +125,12 @@ def search(db: Session, *, q: str | None = None, topic: str | None = None, diffi
     return list(rows), total
 
 
+def suggest(db: Session, query: recommender.Query) -> list[tuple[Question, float, str]]:
+    docs = [to_doc(q) for q in all_questions(db)]
+    scored = recommender.provider.suggest(docs, query)
+    return [(get(db, s.doc.id), s.score, s.reason) for s in scored]
+
+
 def topic_stats(db: Session) -> dict[str, int]:
     rows = db.execute(select(Question.topic, func.count(Question.id)).group_by(Question.topic))
     return {t: c for t, c in rows}
