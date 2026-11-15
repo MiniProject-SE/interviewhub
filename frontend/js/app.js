@@ -27,6 +27,7 @@ const App = {
         case "moderation": return Experiences.moderation(view);
         case "questions": return sub === "new" ? Questions.form(view) : Questions.list(view, params);
         case "practice": return sub ? Practice.session(view, sub) : Practice.setup(view, params);
+        case "dashboard": return Practice.dashboard(view);
         default: return Experiences.list(view);
       }
     } catch (err) { toast(err.message, true); }
