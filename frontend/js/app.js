@@ -23,6 +23,8 @@ const App = {
         case "register": return Auth.register(view);
         case "profile": return Auth.profile(view);
         case "experiences": return sub === "new" ? Experiences.form(view) : Experiences.list(view);
+        case "companies": return Experiences.company(view, decodeURIComponent(sub));
+        case "moderation": return Experiences.moderation(view);
         case "questions": return sub === "new" ? Questions.form(view) : Questions.list(view, params);
         case "practice": return sub ? Practice.session(view, sub) : Practice.setup(view, params);
         default: return Experiences.list(view);

@@ -1,21 +1,37 @@
-/* Browse and share interview experiences. Owner: Member 2. */
+/* Browse, share, vote on and moderate interview experiences. Owner: Member 2. */
 const Experiences = {
   state: { page: 1, filters: {} },
 
-  card(e) {
+  card(e, opts = {}) {
     const rounds = e.rounds.map(r => `<li><b>${esc(r.name)}</b> — ${esc(r.description)}</li>`).join("");
     return `<div class="card">
       <div class="row" style="justify-content:space-between">
         <h3>${esc(e.company)} · ${esc(e.role_title)} <span class="muted">(${e.year})</span></h3>
         <div><span class="pill ${esc(e.outcome)}">${esc(e.outcome)}</span><span class="pill">${esc(e.mode)}</span>
-             <span class="pill">difficulty ${e.difficulty}/5</span></div>
+             <span class="pill">difficulty ${e.difficulty}/5</span>${e.status !== "approved" ? `<span class="pill pending">${esc(e.status)}</span>` : ""}</div>
       </div>
       <p>${esc(e.summary)}</p>
       ${rounds ? `<ol>${rounds}</ol>` : ""}
       ${e.tips ? `<div class="feedback"><b>Tips:</b> ${esc(e.tips)}</div>` : ""}
       <div class="row muted" style="margin-top:10px">by ${esc(e.author)} ·
-        ${e.question_ids.length} question(s) added to bank
+        ${e.question_ids.length} question(s) added to bank ·
+        <button data-vote="${e.id}">▲ ${e.upvotes}</button>
+        <a href="#/companies/${encodeURIComponent(e.company)}">Company insights</a>
+        ${opts.moderate ? `<button class="primary" data-mod="${e.id}" data-approve="1">Approve</button>
+                           <button data-mod="${e.id}" data-approve="0">Reject</button>` : ""}
       </div></div>`;
+  },
+
+  bindCardActions(root, reload) {
+    root.querySelectorAll("[data-vote]").forEach(b => b.onclick = async () => {
+      if (!App.requireLogin()) return;
+      try { const r = await API.post(`/api/experiences/${b.dataset.vote}/vote`); b.textContent = `▲ ${r.upvotes}`; }
+      catch (err) { toast(err.message, true); }
+    });
+    root.querySelectorAll("[data-mod]").forEach(b => b.onclick = async () => {
+      try { await API.post(`/api/experiences/${b.dataset.mod}/moderate`, { approve: b.dataset.approve === "1" }); toast("Done"); reload(); }
+      catch (err) { toast(err.message, true); }
+    });
   },
 
   async list(view) {
@@ -29,6 +45,7 @@ const Experiences = {
         <input name="role" placeholder="Role" value="${esc(f.role)}">
         <select name="outcome"><option value="">Any outcome</option>
           ${["selected", "rejected", "pending", "withdrew"].map(o => `<option ${f.outcome === o ? "selected" : ""}>${o}</option>`).join("")}</select>
+        <select name="sort"><option value="recent">Most recent</option><option value="top" ${f.sort === "top" ? "selected" : ""}>Most helpful</option></select>
         <button>Filter</button>
       </form>
       <div id="exp-list"></div><div class="row" id="exp-pager"></div>`;
@@ -37,6 +54,7 @@ const Experiences = {
       const data = await API.get("/api/experiences", { ...f, page: this.state.page, size: 10 });
       const list = document.getElementById("exp-list");
       list.innerHTML = data.items.map(e => this.card(e)).join("") || `<p class="muted">No experiences match.</p>`;
+      this.bindCardActions(list, () => this.list(view));
       const pages = Math.max(1, Math.ceil(data.total / data.size));
       const pager = document.getElementById("exp-pager");
       pager.innerHTML = `<button id="pg-prev" ${this.state.page <= 1 ? "disabled" : ""}>Prev</button>
@@ -66,7 +84,7 @@ const Experiences = {
         <label>Questions you were asked — one per line as "topic | question" (topics: dsa, dbms, os, networks, oop, system-design, ml, web, behavioral, hr, aptitude)</label>
         <textarea name="questions" style="min-height:70px"></textarea>
         <label><input type="checkbox" name="anonymous"> Post anonymously</label>
-        <p><button class="primary">Publish</button></p>
+        <p><button class="primary">Submit for review</button></p>
       </form></div>`;
     document.getElementById("exp-form").onsubmit = async (e) => {
       e.preventDefault();
@@ -80,9 +98,37 @@ const Experiences = {
       };
       try {
         const res = await API.post("/api/experiences", payload);
-        toast(`Published! ${res.question_ids.length} question(s) added to the bank`);
+        toast(res.status === "approved" ? "Published!" : "Submitted — a moderator will review it");
         location.hash = "#/experiences";
       } catch (err) { toast(err.message, true); }
     };
+  },
+
+  async company(view, name) {
+    try {
+      const s = await API.get(`/api/companies/${encodeURIComponent(name)}/stats`);
+      const exps = await API.get("/api/experiences", { company: name, size: 20 });
+      view.innerHTML = `<h2>${esc(s.company)} — insights</h2>
+        <div class="grid">
+          <div class="card stat"><div class="num">${s.experiences}</div><div class="lbl">experiences</div></div>
+          <div class="card stat"><div class="num">${Math.round(s.selection_rate * 100)}%</div><div class="lbl">selection rate</div></div>
+          <div class="card stat"><div class="num">${s.avg_difficulty}</div><div class="lbl">avg difficulty /5</div></div>
+          <div class="card stat"><div class="num">${s.question_count}</div><div class="lbl">questions in bank</div></div>
+        </div>
+        <p class="muted">Top roles: ${s.top_roles.map(esc).join(", ") || "—"} ·
+          <a href="#/questions?company=${encodeURIComponent(s.company)}">See questions</a> ·
+          <a href="#/practice?company=${encodeURIComponent(s.company)}">Practice for ${esc(s.company)}</a></p>
+        <div id="c-list">${exps.items.map(e => this.card(e)).join("")}</div>`;
+      this.bindCardActions(document.getElementById("c-list"), () => this.company(view, name));
+    } catch (err) { view.innerHTML = `<p class="muted">${esc(err.message)}</p>`; }
+  },
+
+  async moderation(view) {
+    if (!App.requireLogin()) return;
+    try {
+      const items = await API.get("/api/experiences/pending");
+      view.innerHTML = `<h2>Moderation queue (${items.length})</h2><div id="mod-list">${items.map(e => this.card(e, { moderate: true })).join("") || `<p class="muted">Nothing to review.</p>`}</div>`;
+      this.bindCardActions(document.getElementById("mod-list"), () => this.moderation(view));
+    } catch (err) { view.innerHTML = `<p class="muted">${esc(err.message)}</p>`; }
   },
 };
