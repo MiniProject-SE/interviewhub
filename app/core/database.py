@@ -32,5 +32,7 @@ def get_db():
 def init_db(bind=None) -> None:
     """Create all tables. Importing the model modules registers them on Base."""
     from app.modules.auth import models as _a  # noqa: F401
+    from app.modules.companies import models as _c  # noqa: F401
+    from app.modules.questions import models as _q  # noqa: F401
 
     Base.metadata.create_all(bind=bind or engine)
