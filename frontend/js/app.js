@@ -24,6 +24,7 @@ const App = {
         case "profile": return Auth.profile(view);
         case "experiences": return sub === "new" ? Experiences.form(view) : Experiences.list(view);
         case "questions": return sub === "new" ? Questions.form(view) : Questions.list(view, params);
+        case "practice": return sub ? Practice.session(view, sub) : Practice.setup(view, params);
         default: return Experiences.list(view);
       }
     } catch (err) { toast(err.message, true); }

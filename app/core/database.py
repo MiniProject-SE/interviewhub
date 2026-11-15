@@ -35,5 +35,6 @@ def init_db(bind=None) -> None:
     from app.modules.companies import models as _c  # noqa: F401
     from app.modules.experiences import models as _e  # noqa: F401
     from app.modules.questions import models as _q  # noqa: F401
+    from app.modules.practice import models as _p  # noqa: F401
 
     Base.metadata.create_all(bind=bind or engine)
