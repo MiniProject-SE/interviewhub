@@ -59,6 +59,11 @@ class ExperienceUpdate(BaseModel):
         return None if v is None else ExperienceCreate.valid_outcome(v)
 
 
+class ModerationDecision(BaseModel):
+    approve: bool
+    note: str | None = Field(default=None, max_length=300)
+
+
 class RoundOut(BaseModel):
     position: int
     name: str
@@ -76,6 +81,8 @@ class ExperienceOut(BaseModel):
     summary: str
     tips: str | None
     author: str
+    status: str
+    upvotes: int
     rounds: list[RoundOut]
     question_ids: list[int] = Field(default_factory=list)
     created_at: datetime
@@ -86,3 +93,12 @@ class ExperiencePage(BaseModel):
     total: int
     page: int
     size: int
+
+
+class CompanyStats(BaseModel):
+    company: str
+    experiences: int
+    selection_rate: float
+    avg_difficulty: float
+    top_roles: list[str]
+    question_count: int
