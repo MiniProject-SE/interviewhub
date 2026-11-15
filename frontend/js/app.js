@@ -22,6 +22,7 @@ const App = {
         case "login": return Auth.login(view);
         case "register": return Auth.register(view);
         case "profile": return Auth.profile(view);
+        case "questions": return sub === "new" ? Questions.form(view) : Questions.list(view, params);
         default: return API.token() ? Auth.profile(view) : Auth.login(view);
       }
     } catch (err) { toast(err.message, true); }
