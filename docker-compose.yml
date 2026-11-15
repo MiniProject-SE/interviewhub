@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-please-use-a-long-random-value}
+      REQUIRE_MODERATION: "true"
+    volumes:
+      - ih-data:/data
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:lts-community
+    profiles: ["quality"]
+    ports:
+      - "9000:9000"
+
+volumes:
+  ih-data:
