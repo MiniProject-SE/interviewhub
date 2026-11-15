@@ -9,6 +9,7 @@ class StartSession(BaseModel):
     topic: str | None = Field(default=None, max_length=40)
     num_questions: int = Field(default=5, ge=1, le=15)
     duration_minutes: int = Field(default=30, ge=5, le=180)
+    focus_weak_topics: bool = True
 
 
 class AnswerIn(BaseModel):
@@ -55,3 +56,29 @@ class SessionSummary(BaseModel):
     questions: int
     topic: str | None
     company: str | None
+
+
+class TopicStat(BaseModel):
+    topic: str
+    attempts: int
+    avg_score: float
+
+
+class TrendPoint(BaseModel):
+    session_id: int
+    date: datetime
+    score: float
+
+
+class Analytics(BaseModel):
+    sessions_completed: int
+    questions_answered: int
+    average_score: float
+    best_score: float
+    total_practice_minutes: float
+    current_streak_days: int
+    topics: list[TopicStat]
+    weak_topics: list[str]
+    strong_topics: list[str]
+    trend: list[TrendPoint]
+    improvement: float
