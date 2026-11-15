@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import AuthError
+from app.core.errors import AuthError, PermissionDeniedError
 from app.modules.auth.models import User
 from app.modules.auth.security import decode_access_token
 
@@ -38,3 +38,12 @@ def get_optional_user(
         return get_current_user(creds, db)
     except AuthError:
         return None
+
+
+def require_roles(*roles: str):
+    def _checker(user: User = Depends(get_current_user)) -> User:
+        if user.role not in roles:
+            raise PermissionDeniedError("insufficient role")
+        return user
+
+    return _checker

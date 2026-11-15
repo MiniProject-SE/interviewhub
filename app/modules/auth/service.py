@@ -2,7 +2,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.errors import AuthError, ConflictError, NotFoundError
+from app.core.errors import AuthError, ConflictError, NotFoundError, PermissionDeniedError
 from app.modules.auth import schemas
 from app.modules.auth.models import User
 from app.modules.auth.security import create_access_token, hash_password, verify_password
@@ -49,6 +49,8 @@ def authenticate(db: Session, email: str, password: str) -> tuple[User, str]:
     # Same message for unknown email and bad password (no user enumeration, SR-4).
     if user is None or not verify_password(password, user.password_hash):
         raise AuthError("invalid email or password")
+    if not user.is_active:
+        raise AuthError("account disabled")
     return user, create_access_token(user.id, user.role)
 
 
@@ -65,3 +67,27 @@ def change_password(db: Session, user: User, data: schemas.PasswordChange) -> No
         raise AuthError("old password is incorrect")
     user.password_hash = hash_password(data.new_password)
     db.commit()
+
+
+def list_users(db: Session) -> list[User]:
+    return list(db.scalars(select(User).order_by(User.id)))
+
+
+def set_role(db: Session, actor: User, user_id: int, role: str) -> User:
+    target = get_user(db, user_id)
+    if target.id == actor.id:
+        raise PermissionDeniedError("admins cannot change their own role")
+    target.role = role
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+def set_active(db: Session, actor: User, user_id: int, active: bool) -> User:
+    target = get_user(db, user_id)
+    if target.id == actor.id:
+        raise PermissionDeniedError("admins cannot deactivate themselves")
+    target.is_active = active
+    db.commit()
+    db.refresh(target)
+    return target
