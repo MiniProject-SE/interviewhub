@@ -1,8 +1,13 @@
 """Module 1 — Auth & User Management tests (FR-1.x, SR-x)."""
+from datetime import datetime, timedelta, timezone
+
+import jwt
 import pytest
 
 from app.core.config import settings
-from app.modules.auth.security import create_access_token, decode_access_token, hash_password, verify_password
+from app.core.errors import AuthError
+from app.modules.auth.security import (create_access_token, decode_access_token, hash_password,
+                                       verify_password)
 from tests.conftest import PASSWORD
 
 
@@ -40,9 +45,33 @@ def test_login_success_and_me(client, student_h):
     assert r.status_code == 200 and r.json()["email"] == "student@test.dev"
 
 
+def test_login_failure_same_message(client, admin_h):
+    bad_pw = client.post("/api/auth/login", json={"email": "admin@test.dev", "password": "wrong1234"})
+    no_user = client.post("/api/auth/login", json={"email": "ghost@test.dev", "password": "wrong1234"})
+    assert bad_pw.status_code == no_user.status_code == 401
+    assert bad_pw.json() == no_user.json()  # no user enumeration
+
+
 def test_protected_route_requires_token(client):
     assert client.get("/api/users/me").status_code == 401
     assert client.get("/api/users/me", headers={"Authorization": "Bearer garbage"}).status_code == 401
+
+
+def test_expired_token_rejected(client, admin_h):
+    token = create_access_token(1, "admin", expires_minutes=-1)
+    assert client.get("/api/users/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+
+
+def test_tampered_token_rejected():
+    forged = jwt.encode({"sub": "1", "role": "admin", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+                        "attacker-secret-attacker-secret-1234", algorithm="HS256")
+    with pytest.raises(AuthError):
+        decode_access_token(forged)
+
+
+def test_token_for_deleted_user_rejected(client):
+    token = create_access_token(999, "student")
+    assert client.get("/api/users/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
 
 
 def test_password_hashing():
@@ -73,8 +102,36 @@ def test_change_password(client, student_h):
     assert client.post("/api/auth/login", json={"email": "student@test.dev", "password": "NewPass99"}).status_code == 200
 
 
-def test_health(client):
-    assert client.get("/api/health").json()["status"] == "ok"
+def test_admin_user_management(client, admin_h, student_h):
+    assert client.get("/api/users", headers=student_h).status_code == 403
+    users = client.get("/api/users", headers=admin_h).json()
+    sid = next(u["id"] for u in users if u["email"] == "student@test.dev")
+    r = client.patch(f"/api/users/{sid}/role", json={"role": "moderator"}, headers=admin_h)
+    assert r.json()["role"] == "moderator"
+    assert client.patch(f"/api/users/{sid}/role", json={"role": "god"}, headers=admin_h).status_code == 422
+    assert client.patch("/api/users/999/role", json={"role": "student"}, headers=admin_h).status_code == 404
+
+
+def test_admin_cannot_demote_or_disable_self(client, admin_h):
+    me = client.get("/api/users/me", headers=admin_h).json()
+    assert client.patch(f"/api/users/{me['id']}/role", json={"role": "student"}, headers=admin_h).status_code == 403
+    assert client.patch(f"/api/users/{me['id']}/active", params={"active": False}, headers=admin_h).status_code == 403
+
+
+def test_deactivated_user_cannot_login(client, admin_h, student_h):
+    users = client.get("/api/users", headers=admin_h).json()
+    sid = next(u["id"] for u in users if u["email"] == "student@test.dev")
+    assert client.patch(f"/api/users/{sid}/active", params={"active": False}, headers=admin_h).status_code == 200
+    r = client.post("/api/auth/login", json={"email": "student@test.dev", "password": PASSWORD})
+    assert r.status_code == 401 and "disabled" in r.json()["detail"]
+    assert client.get("/api/users/me", headers=student_h).status_code == 401
+
+
+def test_health_and_security_headers(client):
+    r = client.get("/api/health")
+    assert r.json()["status"] == "ok"
+    assert r.headers["X-Content-Type-Options"] == "nosniff"
+    assert r.headers["X-Frame-Options"] == "DENY"
 
 
 def test_frontend_served(client):

@@ -71,4 +71,17 @@ class PasswordChange(BaseModel):
         return RegisterRequest.strong_password(v)
 
 
+class RoleUpdate(BaseModel):
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def valid_role(cls, v: str) -> str:
+        from app.modules.auth.models import ROLES
+
+        if v not in ROLES:
+            raise ValueError(f"role must be one of {ROLES}")
+        return v
+
+
 TokenResponse.model_rebuild()

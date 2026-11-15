@@ -34,6 +34,14 @@ def create_app() -> FastAPI:
     async def _app_error(_: Request, exc: AppError):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
+    @app.middleware("http")
+    async def _security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+
     @app.get("/api/health", tags=["meta"])
     def health():
         return {"status": "ok", "version": settings.version}
