@@ -12,6 +12,7 @@ from app.core.database import init_db
 from app.core.errors import AppError
 from app.modules.auth.router import router as auth_router
 from app.modules.experiences.router import router as experiences_router
+from app.modules.practice.router import router as practice_router
 from app.modules.questions.router import router as questions_router
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -37,7 +38,7 @@ def create_app() -> FastAPI:
     def health():
         return {"status": "ok", "version": settings.version}
 
-    for r in (auth_router, experiences_router, questions_router):
+    for r in (auth_router, experiences_router, questions_router, practice_router):
         app.include_router(r)
 
     if FRONTEND_DIR.exists():
